@@ -3790,7 +3790,7 @@ def SplitConstructorArguments(argument_text):
     if not argument_text:
         return []
 
-    def split(allow_constant_relational):
+    def SplitPass(allow_constant_relational):
         arguments = []
         current = []
         angle_depth = 0
@@ -3856,9 +3856,9 @@ def SplitConstructorArguments(argument_text):
         arguments.append("".join(current))
         return arguments, angle_depth
 
-    initial, unmatched = split(False)
+    initial, unmatched = SplitPass(False)
     if unmatched > 0:
-        recovered, remainder = split(True)
+        recovered, remainder = SplitPass(True)
         if remainder == 0 and len(recovered) > len(initial):
             return recovered
     return initial
