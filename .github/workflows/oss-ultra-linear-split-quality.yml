@@ -21,3 +21,17 @@ jobs:
         run: python -m pip install pre-commit==4.7.0
       - name: Validate linear-split source and tests
         run: pre-commit run --files cpplint.py cpplint_unittest.py --show-diff-on-failure --color never
+      - name: Compile C++17 comparison controls (GCC and Clang)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/oss-ultra-nontype-compare.cpp <<'CPP'
+          template <bool, class T> struct Foo {};
+          constexpr int N = 1, M = 2;
+          struct A { A(Foo<N < 2, int> value, int code); };
+          struct B { B(Foo<N < M, int> value, int code); };
+          struct C { C(Foo<'a' < 'b', int> value, int code); };
+          struct D { D(Foo<true && N < 2, int> value, int code); };
+          CPP
+          g++ -std=c++17 -fsyntax-only /tmp/oss-ultra-nontype-compare.cpp
+          clang++ -std=c++17 -fsyntax-only /tmp/oss-ultra-nontype-compare.cpp
