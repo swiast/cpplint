@@ -1722,6 +1722,23 @@ class TestCpplint(CpplintTestBase):
             ),
         )
 
+    def testConstructorIdentifierComparisonsRequireTwoParameters(self):
+        # Valid C++17 constant comparisons must retain both constructor params.
+        for expression in ("N < 2", "N < M", "'a' < 'b'", "true && N < 2"):
+            diagnostics = self.PerformMultiLineLint(
+                f"""
+          class A {{
+            A(Foo<{expression}, int> value, int code);
+          }};"""
+            )
+            assert "[runtime/explicit]" not in str(diagnostics), expression
+
+    def testSplitIdentifierComparisonsInTemplateArgs(self):
+        for expression in ("N < 2", "N < M", "'a' < 'b'", "true && N < 2"):
+            source = f"Foo<{expression}, int> value, int code"
+            expected = [f"Foo<{expression}, int> value", " int code"]
+            assert cpplint.SplitConstructorArguments(source) == expected
+
     def testSplitConstructorArgumentsLinear(self):
         # Exercise comma, template, paren and operator interactions directly.
         cases = [
