@@ -3820,7 +3820,9 @@ def SplitConstructorArguments(argument_text):
                 while probe >= 0 and argument_text[probe].isspace():
                     probe -= 1
                 word_end = probe
-                while probe >= 0 and (argument_text[probe].isalnum() or argument_text[probe] == "_"):
+                while probe >= 0 and (
+                    argument_text[probe].isalnum() or argument_text[probe] == "_"
+                ):
                     probe -= 1
                 word = argument_text[probe + 1 : word_end + 1]
                 if word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"):
