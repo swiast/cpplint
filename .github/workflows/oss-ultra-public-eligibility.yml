@@ -1,0 +1,76 @@
+# Internal, read-only public eligibility evidence check on the user's own fork.
+# Never promote to upstream. Do not count diagnostic self-PR as independent OSS activity.
+name: OSS-ULTRA public eligibility evidence
+on:
+  pull_request:
+    branches:
+      - develop
+permissions:
+  contents: read
+jobs:
+  facts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Query public primary-source GitHub age and PyPI download metrics
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime
+          import json
+          import urllib.error
+          import urllib.request
+
+          sources = [
+              ("github_profile", "https://api.github.com/users/swiast"),
+              ("pypistats_cpplint", "https://pypistats.org/api/packages/cpplint/recent"),
+          ]
+          print("OBSERVED_AT_UTC", datetime.datetime.now(datetime.timezone.utc).isoformat(), flush=True)
+          for label, url in sources:
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "oss-ultra-public-readonly-evidence-check/1.0",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as response:
+                      payload = json.load(response)
+                      print(label, "HTTP", response.status, "SOURCE", url, flush=True)
+                  if label == "github_profile":
+                      print(
+                          "GITHUB_PUBLIC_PROFILE",
+                          json.dumps(
+                              {
+                                  "login": payload.get("login"),
+                                  "id": payload.get("id"),
+                                  "created_at": payload.get("created_at"),
+                                  "type": payload.get("type"),
+                              },
+                              sort_keys=True,
+                          ),
+                          flush=True,
+                      )
+                  else:
+                      print(
+                          "PYPI_PUBLIC_RECENT",
+                          json.dumps(
+                              {
+                                  "package": payload.get("package"),
+                                  "type": payload.get("type"),
+                                  "data": payload.get("data"),
+                              },
+                              sort_keys=True,
+                          ),
+                          flush=True,
+                      )
+              except Exception as exc:
+                  print(label, "ERROR", type(exc).__name__, str(exc)[:300], flush=True)
+          PY
