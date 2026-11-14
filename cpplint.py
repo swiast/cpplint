@@ -3791,6 +3791,7 @@ def SplitConstructorArguments(argument_text):
         return []
 
     parameter_suffix = re.compile(r"\s+[A-Za-z_]\w*\s*(?:,|$)")
+    declaration_closers = set()
 
     def SplitPass(next_greater=None):
         arguments = []
@@ -3828,7 +3829,7 @@ def SplitConstructorArguments(argument_text):
                 if (
                     right >= 0
                     and (word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"))
-                    and parameter_suffix.match(argument_text, right + 1)
+                    and right in declaration_closers
                 ):
                     current.append(char)
                     previous_significant = char
@@ -3868,6 +3869,8 @@ def SplitConstructorArguments(argument_text):
         for index in range(len(argument_text) - 1, -1, -1):
             next_greater[index] = closest
             if argument_text[index] == ">":
+                if parameter_suffix.match(argument_text, index + 1):
+                    declaration_closers.add(index)
                 closest = index
         recovered, remainder = SplitPass(next_greater)
         if remainder == 0 and len(recovered) > len(initial):
