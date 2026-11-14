@@ -3806,9 +3806,7 @@ def SplitConstructorArguments(argument_text):
             index += 2
             continue
         # A numeric or parenthesized left operand makes '<' relational.
-        if char == "<" and (
-            previous_significant.isdigit() or previous_significant == ")"
-        ):
+        if char == "<" and (previous_significant.isdigit() or previous_significant == ")"):
             current.append(char)
             previous_significant = char
             index += 1
