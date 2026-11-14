@@ -3786,11 +3786,13 @@ class NestingState:
 
 
 def SplitConstructorArguments(argument_text):
-    """Split top-level commas; recover ambiguous identifier comparisons conservatively."""
+    """Split top-level commas, conservatively recovering constant comparisons."""
     if not argument_text:
         return []
 
-    def SplitPass(allow_constant_relational):
+    parameter_suffix = re.compile(r"\s+[A-Za-z_]\w*\s*(?:,|$)")
+
+    def SplitPass(next_greater=None):
         arguments = []
         current = []
         angle_depth = 0
@@ -3800,22 +3802,19 @@ def SplitConstructorArguments(argument_text):
         while index < len(argument_text):
             char = argument_text[index]
             token = argument_text[index : index + 2]
-            # Shifts and two-character comparisons are not template delimiters.
             if token in ("<<", "<=", ">="):
                 current.append(token)
                 previous_significant = token[-1]
                 index += 2
                 continue
-            # The left operand of a numeric/parenthesized comparison is known.
             if char == "<" and (previous_significant.isdigit() or previous_significant == ")"):
                 current.append(char)
                 previous_significant = char
                 index += 1
                 continue
-            # Recover only after the first scan reports unmatched angle brackets.
-            # Uppercase constants and character literals may begin non-type
-            # template arguments; avoid changing normally balanced templates.
-            if char == "<" and allow_constant_relational and angle_depth > 0:
+            # Only retry a plausible constant comparison if the next '>'
+            # closes a parameter declaration, not a nested type argument.
+            if char == "<" and next_greater is not None and angle_depth > 0:
                 probe = index - 1
                 while probe >= 0 and argument_text[probe].isspace():
                     probe -= 1
@@ -3825,7 +3824,12 @@ def SplitConstructorArguments(argument_text):
                 ):
                     probe -= 1
                 word = argument_text[probe + 1 : word_end + 1]
-                if word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"):
+                right = next_greater[index]
+                if (
+                    right >= 0
+                    and (word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"))
+                    and parameter_suffix.match(argument_text, right + 1)
+                ):
                     current.append(char)
                     previous_significant = char
                     index += 1
@@ -3856,9 +3860,16 @@ def SplitConstructorArguments(argument_text):
         arguments.append("".join(current))
         return arguments, angle_depth
 
-    initial, unmatched = SplitPass(False)
+    initial, unmatched = SplitPass()
     if unmatched > 0:
-        recovered, remainder = SplitPass(True)
+        # A precomputed next-closer table avoids repeated suffix scans.
+        next_greater = [-1] * len(argument_text)
+        closest = -1
+        for index in range(len(argument_text) - 1, -1, -1):
+            next_greater[index] = closest
+            if argument_text[index] == ">":
+                closest = index
+        recovered, remainder = SplitPass(next_greater)
         if remainder == 0 and len(recovered) > len(initial):
             return recovered
     return initial
