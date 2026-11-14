@@ -32,6 +32,10 @@ jobs:
           struct B { B(Foo<N < M, int> value, int code); };
           struct C { C(Foo<'a' < 'b', int> value, int code); };
           struct D { D(Foo<true && N < 2, int> value, int code); };
+          template <class> struct Upper {};
+          struct Lower {};
+          template <class, bool> struct TypeBool {};
+          struct E { E(int code, TypeBool<Upper<Lower>, N<M> value); };
           CPP
           g++ -std=c++17 -fsyntax-only /tmp/oss-ultra-nontype-compare.cpp
           clang++ -std=c++17 -fsyntax-only /tmp/oss-ultra-nontype-compare.cpp
