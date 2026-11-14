@@ -1739,6 +1739,17 @@ class TestCpplint(CpplintTestBase):
             expected = [f"Foo<{expression}, int> value", " int code"]
             assert cpplint.SplitConstructorArguments(source) == expected
 
+    def testSplitConservativeNestedTemplateControls(self):
+        # A spaced nested template opener must not become a comparison.
+        controls = (
+            "Foo<Bar < int >, int> value, int code",
+            "Foo<Bar<int>, N < M> value, int code",
+            "Foo<Bar < int >, N<M> value, int code",
+        )
+        for source in controls:
+            expected = [source.split(" value,")[0] + " value", " int code"]
+            assert cpplint.SplitConstructorArguments(source) == expected
+
     def testSplitConstructorArgumentsLinear(self):
         # Exercise comma, template, paren and operator interactions directly.
         cases = [
