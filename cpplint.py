@@ -3786,56 +3786,80 @@ class NestingState:
 
 
 def SplitConstructorArguments(argument_text):
-    """Split on top-level commas without repeatedly scanning merged fragments."""
+    """Split top-level commas; recover ambiguous identifier comparisons conservatively."""
     if not argument_text:
         return []
 
-    arguments = []
-    current = []
-    angle_depth = 0
-    paren_depth = 0
-    previous_significant = ""
-    index = 0
-    while index < len(argument_text):
-        char = argument_text[index]
-        token = argument_text[index : index + 2]
-        # Shifts and two-character comparisons are not template delimiters.
-        if token in ("<<", "<=", ">="):
-            current.append(token)
-            previous_significant = token[-1]
-            index += 2
-            continue
-        # A numeric or parenthesized left operand makes '<' relational.
-        if char == "<" and (previous_significant.isdigit() or previous_significant == ")"):
-            current.append(char)
-            previous_significant = char
-            index += 1
-            continue
-
-        if char == "(":
-            paren_depth += 1
-        elif char == ")":
-            paren_depth -= 1
-        elif paren_depth == 0:
-            if char == "<":
-                angle_depth += 1
-            elif char == ">":
-                angle_depth -= 1
-
-        if char == "," and angle_depth <= 0 and paren_depth <= 0:
-            arguments.append("".join(current))
-            current = []
-            angle_depth = 0
-            paren_depth = 0
-            previous_significant = ""
-        else:
-            current.append(char)
-            if not char.isspace():
+    def split(allow_constant_relational):
+        arguments = []
+        current = []
+        angle_depth = 0
+        paren_depth = 0
+        previous_significant = ""
+        index = 0
+        while index < len(argument_text):
+            char = argument_text[index]
+            token = argument_text[index : index + 2]
+            # Shifts and two-character comparisons are not template delimiters.
+            if token in ("<<", "<=", ">="):
+                current.append(token)
+                previous_significant = token[-1]
+                index += 2
+                continue
+            # The left operand of a numeric/parenthesized comparison is known.
+            if char == "<" and (previous_significant.isdigit() or previous_significant == ")"):
+                current.append(char)
                 previous_significant = char
-        index += 1
+                index += 1
+                continue
+            # Recover only after the first scan reports unmatched angle brackets.
+            # Uppercase constants and character literals may begin non-type
+            # template arguments; avoid changing normally balanced templates.
+            if char == "<" and allow_constant_relational and angle_depth > 0:
+                probe = index - 1
+                while probe >= 0 and argument_text[probe].isspace():
+                    probe -= 1
+                word_end = probe
+                while probe >= 0 and (argument_text[probe].isalnum() or argument_text[probe] == "_"):
+                    probe -= 1
+                word = argument_text[probe + 1 : word_end + 1]
+                if word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"):
+                    current.append(char)
+                    previous_significant = char
+                    index += 1
+                    continue
 
-    arguments.append("".join(current))
-    return arguments
+            if char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth -= 1
+            elif paren_depth == 0:
+                if char == "<":
+                    angle_depth += 1
+                elif char == ">":
+                    angle_depth -= 1
+
+            if char == "," and angle_depth <= 0 and paren_depth <= 0:
+                arguments.append("".join(current))
+                current = []
+                angle_depth = 0
+                paren_depth = 0
+                previous_significant = ""
+            else:
+                current.append(char)
+                if not char.isspace():
+                    previous_significant = char
+            index += 1
+
+        arguments.append("".join(current))
+        return arguments, angle_depth
+
+    initial, unmatched = split(False)
+    if unmatched > 0:
+        recovered, remainder = split(True)
+        if remainder == 0 and len(recovered) > len(initial):
+            return recovered
+    return initial
 
 
 def HasDefaultConstructorInitializer(argument):
