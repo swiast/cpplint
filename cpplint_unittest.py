@@ -1750,6 +1750,13 @@ class TestCpplint(CpplintTestBase):
             expected = [source.split(" value,")[0] + " value", " int code"]
             assert cpplint.SplitConstructorArguments(source) == expected
 
+    def testSplitUppercaseTypeTemplateBeforeComparison(self):
+        # A valid nested type must not become a relational operator merely
+        # because a later unspaced constant comparison is unmatched.
+        source = "int code, Foo<T<U>, N<M> value"
+        expected = ["int code", " Foo<T<U>, N<M> value"]
+        assert cpplint.SplitConstructorArguments(source) == expected
+
     def testSplitConstructorArgumentsLinear(self):
         # Exercise comma, template, paren and operator interactions directly.
         cases = [
