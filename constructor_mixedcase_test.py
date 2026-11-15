@@ -49,9 +49,9 @@ def test_mixed_case_constexpr_expression_compiles(compiler, symbol):
     if compiler_path is None:
         pytest.skip(f"{compiler} is unavailable")
     source = (
-        "template<bool, class T> struct Flag {};\\n"
-        f"constexpr int {symbol} = 1;\\n"
-        f"struct A {{ A(Flag<{symbol} < 2, int> value, int code); }};\\n"
+        "template<bool, class T> struct Flag {};\n"
+        f"constexpr int {symbol} = 1;\n"
+        f"struct A {{ A(Flag<{symbol} < 2, int> value, int code); }};\n"
     )
     result = subprocess.run(
         [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
