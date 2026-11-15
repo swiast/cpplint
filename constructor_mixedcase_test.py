@@ -391,3 +391,70 @@ def test_multi_template_comma_guard_compiles_as_cpp17(compiler):
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+# Counterexamples to a broad rule that treats any '<' after a name as
+# relational whenever a later terminal '>' exists. Inside Outer<...>,
+# SomeTemplate < 2 is a real nested template opener, whereas Value < 2
+# is a constant expression. The structurally similar existing xfail
+# Outer<Value < 2, Inner<int>, Another> stays explicit above.
+_TYPE_RELATIONAL_CONTEXT_GUARDS = (
+    (
+        "Outer<SomeTemplate < 2, Inner<int>, Another>, Value < 2> value",
+        "bool",
+    ),
+    (
+        "Outer<SomeTemplate < 2, Inner<int>, Another>, "
+        "Value < 2 && Value < 3> value",
+        "bool",
+    ),
+    (
+        "Outer<SomeTemplate<2, Inner<int>, Another>, Value < 2> value",
+        "bool",
+    ),
+    (
+        "Outer<SomeTemplate<2, Inner<int>, Another>, "
+        "Value < 2 && Value < 3> value",
+        "bool",
+    ),
+    (
+        "Outer<SomeTemplate < 2, Inner<int>, Another>, Another> value",
+        "class",
+    ),
+)
+
+
+@pytest.mark.parametrize(("declaration", "outer_kind"), _TYPE_RELATIONAL_CONTEXT_GUARDS)
+def test_nested_template_openers_remain_openers(declaration, outer_kind):
+    """Do not 'repair' inner type templates as constant comparisons."""
+    del outer_kind
+    assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
+        declaration,
+        " int code",
+    ]
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+@pytest.mark.parametrize(("declaration", "outer_kind"), _TYPE_RELATIONAL_CONTEXT_GUARDS)
+def test_nested_template_openers_compile_cpp17(compiler, declaration, outer_kind):
+    """Compile type/value ambiguity guards with real C++17 declarations."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    source = (
+        "template<class T> struct Inner {};\n"
+        "template<int N, class T, class U> struct SomeTemplate {};\n"
+        "struct Another {};\n"
+        "constexpr int Value = 1;\n"
+        f"template<class T, {outer_kind} U> struct Outer {{}};\n"
+        f"struct A {{ A({declaration}, int code); }};\n"
+    )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input=source,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
