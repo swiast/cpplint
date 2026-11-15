@@ -8,7 +8,7 @@ import pytest
 import cpplint
 
 
-@pytest.mark.parametrize("symbol", ["Value", "kCount", "isEnabled"])
+@pytest.mark.parametrize("symbol", ["Value", "kCount", "isEnabled", "Count"])
 def test_mixed_case_constant_comparisons_preserve_required_arguments(symbol):
     """An identifier-led comparison must not swallow the outer parameter comma."""
     source = f"Foo<{symbol} < 2, int> value, int code"
