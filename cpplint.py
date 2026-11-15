@@ -3826,9 +3826,11 @@ def SplitConstructorArguments(argument_text):
                     probe -= 1
                 word = argument_text[probe + 1 : word_end + 1]
                 right = next_greater[index]
+                # Case alone cannot distinguish type and value identifiers:
+                # mixed-case constants also require recovery at a parameter closer.
                 if (
                     right >= 0
-                    and (word.isupper() or (word_end >= 0 and argument_text[word_end] == "'"))
+                    and (word or (word_end >= 0 and argument_text[word_end] == "'"))
                     and right in declaration_closers
                 ):
                     current.append(char)
