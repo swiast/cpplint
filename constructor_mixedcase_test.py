@@ -1,8 +1,9 @@
 """Research-only constructor template comparison regressions.
 
-These are Python-level splitter checks, not independent C++ compilation.
+These contain Python splitter checks and optional C++17 compiler validation.
 """
 
+import itertools
 import shutil
 import subprocess
 
@@ -103,6 +104,91 @@ def test_mixed_case_constexpr_expression_compiles(compiler, symbol):
     result = subprocess.run(
         [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
         input=source,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+# Research-only bounded differential stress checks, independently source-reviewed.
+# These exercise the parser's top-level comma grouping; they do not establish
+# exhaustive C++ grammar correctness.
+_GRID_NAMES = ("Value", "kCount", "isEnabled", "Count", "N", "MAX_N", "threshold")
+_GRID_RIGHTS = ("2", "Limit", "1", "MAX_N")
+_GRID_TYPES = (
+    "int",
+    "long",
+    "std::vector<int>",
+    "std::pair<int, int>",
+    "std::array<int, 2>",
+    "std::vector<std::pair<int, int>>",
+    "std::vector<std::vector<int>>",
+)
+_BALANCED_LEFT_TYPES = (
+    "Bar<int>",
+    "Bar<Bar<int>>",
+    "Bar < int >",
+    "Bar<std::vector<int>>",
+    "std::pair<int,int>",
+    "std::vector<std::array<int,2>>",
+    "FooTwo<int, Bar<double>>",
+    "Bar<Value>",
+)
+_BALANCED_RIGHT_TYPES = (
+    "int",
+    "std::vector<int>",
+    "std::pair<int,int>",
+    "std::vector<std::pair<int,int>>",
+    "std::array<int, 2>",
+)
+
+
+def test_generated_nested_type_comparison_grid():
+    """196 outer two-parameter comparisons must survive nested type closers."""
+    for symbol, rhs, nested_type in itertools.product(
+        _GRID_NAMES, _GRID_RIGHTS, _GRID_TYPES
+    ):
+        declaration = f"Foo<{symbol} < {rhs}, {nested_type}> value"
+        actual = cpplint.SplitConstructorArguments(declaration + ", int code")
+        assert actual == [declaration, " int code"], (
+            f"{symbol=}, {rhs=}, {nested_type=}: {actual!r}"
+        )
+
+
+def test_generated_balanced_nested_template_controls():
+    """Forty real template openers must not be mistaken for a comparison."""
+    for left, right in itertools.product(_BALANCED_LEFT_TYPES, _BALANCED_RIGHT_TYPES):
+        declaration = f"Outer<{left}, {right}> value"
+        actual = cpplint.SplitConstructorArguments(declaration + ", int code")
+        assert actual == [declaration, " int code"], (left, right, actual)
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+def test_generated_nested_comparison_grid_compiles_cpp17(compiler):
+    """Compile the same 196 unambiguous comparisons in one translation unit."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    declarations = [
+        "#include <vector>",
+        "#include <utility>",
+        "#include <array>",
+        "template<bool, class T> struct Foo {};",
+        "constexpr int Value=1, kCount=1, isEnabled=1, Count=1;",
+        "constexpr int N=1, MAX_N=2, threshold=1, Limit=2;",
+    ]
+    for index, (symbol, rhs, nested_type) in enumerate(
+        itertools.product(_GRID_NAMES, _GRID_RIGHTS, _GRID_TYPES)
+    ):
+        declarations.append(
+            f"struct Case{index} {{ Case{index}("
+            f"Foo<{symbol} < {rhs}, {nested_type}> value, int code); }};"
+        )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input="\n".join(declarations) + "\n",
         text=True,
         capture_output=True,
         check=False,
