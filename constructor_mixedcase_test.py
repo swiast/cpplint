@@ -3,6 +3,9 @@
 These are Python-level splitter checks, not independent C++ compilation.
 """
 
+import shutil
+import subprocess
+
 import pytest
 
 import cpplint
@@ -36,3 +39,26 @@ def test_mixed_case_recovery_preserves_nested_template_controls(source):
     else:
         expected = [source.split(" value,")[0] + " value", " int code"]
     assert cpplint.SplitConstructorArguments(source) == expected
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+@pytest.mark.parametrize("symbol", ["Value", "kCount", "isEnabled", "Count"])
+def test_mixed_case_constexpr_expression_compiles(compiler, symbol):
+    """Verify the regressions use syntactically valid C++17 constructors."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    source = (
+        "template<bool, class T> struct Flag {};\\n"
+        f"constexpr int {symbol} = 1;\\n"
+        f"struct A {{ A(Flag<{symbol} < 2, int> value, int code); }};\\n"
+    )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input=source,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
