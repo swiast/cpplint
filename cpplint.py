@@ -3790,7 +3790,14 @@ def SplitConstructorArguments(argument_text):
     if not argument_text:
         return []
 
-    parameter_suffix = re.compile(r"\s+[A-Za-z_]\w*\s*(?:,|$)")
+    # A terminal template closer may precede a named CV/ref/pointer
+    # declarator, not just a whitespace-separated bare identifier.
+    # Unnamed parameters remain a separate known limitation.
+    parameter_suffix = re.compile(
+        r"(?=[\s*&])\s*(?:(?:const|volatile)\b\s*)*"
+        r"(?:[*&]\s*(?:(?:const|volatile)\b\s*)*)*"
+        r"[A-Za-z_]\w*\s*(?:,|$)"
+    )
     declaration_closers = set()
 
     def SplitPass(next_greater=None):
