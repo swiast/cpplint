@@ -3868,12 +3868,19 @@ def SplitConstructorArguments(argument_text):
         # A precomputed next-closer table avoids repeated suffix scans.
         next_greater = [-1] * len(argument_text)
         closest = -1
+        next_nonspace = -1
         for index in range(len(argument_text) - 1, -1, -1):
             next_greater[index] = closest
             if argument_text[index] == ">":
                 if parameter_suffix.match(argument_text, index + 1):
                     declaration_closers.add(index)
+                # '>>' or '> >' may close nested template arguments
+                # immediately before the constructor parameter's name.
+                if next_nonspace in declaration_closers:
+                    declaration_closers.add(index)
                 closest = index
+            if not argument_text[index].isspace():
+                next_nonspace = index
         recovered, remainder = SplitPass(next_greater)
         if remainder == 0 and len(recovered) > len(initial):
             return recovered
