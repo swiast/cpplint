@@ -3790,14 +3790,21 @@ def SplitConstructorArguments(argument_text):
     if not argument_text:
         return []
 
-    # A terminal template closer may precede a named CV/ref/pointer
-    # declarator, not just a whitespace-separated bare identifier.
-    # Unnamed parameters remain a separate known limitation.
-    parameter_suffix = re.compile(
+    # Named CV/ref/pointer declarators remain the primary closure cue.
+    named_suffix = (
         r"(?=[\s*&])\s*(?:(?:const|volatile)\b\s*)*"
         r"(?:[*&]\s*(?:(?:const|volatile)\b\s*)*)*"
         r"[A-Za-z_]\w*\s*(?:,|$)"
     )
+    # A bare template-typed parameter may end directly before a comma.
+    # Only recover it if the NEXT parameter is a simple named declaration;
+    # accepting every comma would incorrectly split commas within templates.
+    unnamed_suffix = (
+        r"(?=[\s*&,])\s*(?:(?:const|volatile)\b\s*)*"
+        r"(?:[*&]\s*(?:(?:const|volatile)\b\s*)*)*"
+        r"(?=\s*,\s*[A-Za-z_]\w*\s+[*&]?\s*[A-Za-z_]\w*\s*(?:,|$))"
+    )
+    parameter_suffix = re.compile(rf"(?:{named_suffix}|{unnamed_suffix})")
     declaration_closers = set()
 
     def SplitPass(next_greater=None):
