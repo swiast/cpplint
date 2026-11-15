@@ -288,7 +288,7 @@ def test_nttp_cvref_named_parameter_preserves_argument(declaration):
 
 @pytest.mark.parametrize("declaration", _CVREF_UNNAMED_CASES)
 def test_nttp_cvref_unnamed_parameter_preserves_argument(declaration):
-    """Track unresolved nameless template parameter handling explicitly."""
+    """Recover unnamed templates before a simple named next parameter."""
     assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
         declaration, " int code"
     ]
