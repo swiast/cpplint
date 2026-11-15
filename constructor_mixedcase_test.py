@@ -266,8 +266,8 @@ _CVREF_NAMED_CASES = (
     "Foo<Value < 2, std::vector<int>> const* value",
 )
 
-# Unnamed constructor parameters remain unresolved. Keep these as
-# strict expected-failures instead of inflating validation success.
+# Research recovery for unnamed template-typed constructor parameters:
+# allow only a narrowly recognized, simple named next parameter.
 _CVREF_UNNAMED_CASES = (
     "Foo<Value < 2, std::vector<int>>",
     "Foo<Value < 2, std::vector<int>> const&",
@@ -286,12 +286,8 @@ def test_nttp_cvref_named_parameter_preserves_argument(declaration):
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known limitation: unnamed template-typed constructor parameter",
-)
 @pytest.mark.parametrize("declaration", _CVREF_UNNAMED_CASES)
-def test_nttp_cvref_unnamed_parameter_known_limitation(declaration):
+def test_nttp_cvref_unnamed_parameter_preserves_argument(declaration):
     """Track unresolved nameless template parameter handling explicitly."""
     assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
         declaration, " int code"
@@ -314,6 +310,76 @@ def test_nttp_cvref_named_and_unnamed_are_valid_cpp17(compiler):
     ):
         declarations.append(
             f"struct CvRefCase{index} {{ CvRefCase{index}("
+            f"{declaration}, int code); }};"
+        )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input="\n".join(declarations) + "\n",
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+# These compiler-accepted three-template-parameter declarations demonstrate
+# why a blanket '>' followed by comma is not a safe terminal-closer rule.
+# The first three must remain grouped; the last three expose an older
+# limitation that this narrow unnamed-parameter change must not worsen.
+_MULTI_TEMPLATE_SAFE_GUARDS = (
+    "Outer<Value < 2, Inner<int>, Last<int>> value",
+    "Outer<Value < 2, std::vector<int>, std::pair<int, int>> value",
+    "Outer<Value < 2, Inner<int>, std::array<int, 2>> value",
+)
+_MULTI_TEMPLATE_EXISTING_LIMITATIONS = (
+    "Outer<Value < 2, Inner<int>, Another> value",
+    "Outer<Value < 2, Inner<int>, int> value",
+    "Outer<Value < 2, Inner<Last<int>>, Another> value",
+)
+
+
+@pytest.mark.parametrize("declaration", _MULTI_TEMPLATE_SAFE_GUARDS)
+def test_unnamed_recovery_does_not_split_inner_template_commas(declaration):
+    """The inner nested-type comma is not a constructor argument delimiter."""
+    assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
+        declaration, " int code"
+    ]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Existing limitation: constant comparison plus non-nested final type argument",
+)
+@pytest.mark.parametrize("declaration", _MULTI_TEMPLATE_EXISTING_LIMITATIONS)
+def test_multi_template_final_plain_type_known_limitation(declaration):
+    """Track known multi-argument templates rather than imply a full C++ parser."""
+    assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
+        declaration, " int code"
+    ]
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+def test_multi_template_comma_guard_compiles_as_cpp17(compiler):
+    """Validate all six three-template-argument declarations with C++17."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    declarations = [
+        "#include <array>",
+        "#include <utility>",
+        "#include <vector>",
+        "constexpr int Value=1;",
+        "using Another=int;",
+        "template<class T> struct Inner {};",
+        "template<class T> struct Last {};",
+        "template<bool B, class T, class U> struct Outer {};",
+    ]
+    for index, declaration in enumerate(
+        _MULTI_TEMPLATE_SAFE_GUARDS + _MULTI_TEMPLATE_EXISTING_LIMITATIONS
+    ):
+        declarations.append(
+            f"struct MultiTypeCase{index} {{ MultiTypeCase{index}("
             f"{declaration}, int code); }};"
         )
     result = subprocess.run(
