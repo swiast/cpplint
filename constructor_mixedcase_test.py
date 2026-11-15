@@ -247,3 +247,81 @@ def test_compound_nttp_expression_grid_compiles_cpp17(compiler):
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+# Named parameter forms accepted by C++17 compilers, but mishandled by
+# the previous terminal-closer pattern which demanded whitespace+name.
+_CVREF_NAMED_CASES = (
+    "Foo<Value < 2, std::vector<int>> value",
+    "const Foo<Value < 2, std::vector<int>>& value",
+    "Foo<Value < 2, std::vector<int>> const& value",
+    "Foo<Value < 2, std::vector<int>> const & value",
+    "Foo<Value < 2, std::vector<int>>& value",
+    "Foo<Value < 2, std::vector<int>>&& value",
+    "Foo<Value < 2, std::vector<int>>* value",
+    "Foo<Value < 2, std::vector<int>> *const value",
+    "Foo<Value < 2, std::vector<int>>* const value",
+    "Foo<Value < 2, std::vector<int>> volatile value",
+    "Foo<Value < 2, std::vector<int>> const volatile& value",
+    "Foo<Value < 2, std::vector<int>> const* value",
+)
+
+# Unnamed constructor parameters remain unresolved. Keep these as
+# strict expected-failures instead of inflating validation success.
+_CVREF_UNNAMED_CASES = (
+    "Foo<Value < 2, std::vector<int>>",
+    "Foo<Value < 2, std::vector<int>> const&",
+    "Foo<Value < 2, std::vector<int>>&",
+    "Foo<Value < 2, std::vector<int>>*",
+    "Foo<Value < 2, std::vector<int>> const*",
+    "const Foo<Value < 2, std::vector<int>>&",
+)
+
+
+@pytest.mark.parametrize("declaration", _CVREF_NAMED_CASES)
+def test_nttp_cvref_named_parameter_preserves_argument(declaration):
+    """CV/ref/pointer parameter suffixes must not swallow the outer comma."""
+    assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
+        declaration, " int code"
+    ]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Known limitation: unnamed template-typed constructor parameter",
+)
+@pytest.mark.parametrize("declaration", _CVREF_UNNAMED_CASES)
+def test_nttp_cvref_unnamed_parameter_known_limitation(declaration):
+    """Track unresolved nameless template parameter handling explicitly."""
+    assert cpplint.SplitConstructorArguments(declaration + ", int code") == [
+        declaration, " int code"
+    ]
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+def test_nttp_cvref_named_and_unnamed_are_valid_cpp17(compiler):
+    """Compiler oracle for all eighteen CV/ref/pointer declarations."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    declarations = [
+        "#include <vector>",
+        "template<bool, class T> struct Foo {};",
+        "constexpr int Value=1;",
+    ]
+    for index, declaration in enumerate(
+        _CVREF_NAMED_CASES + _CVREF_UNNAMED_CASES
+    ):
+        declarations.append(
+            f"struct CvRefCase{index} {{ CvRefCase{index}("
+            f"{declaration}, int code); }};"
+        )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input="\n".join(declarations) + "\n",
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
