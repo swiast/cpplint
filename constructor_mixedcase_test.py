@@ -195,3 +195,55 @@ def test_generated_nested_comparison_grid_compiles_cpp17(compiler):
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+# Valid C++17 constant-expression operator combinations. These control
+# whether nested templates and relational operators are parsed together.
+_COMPOUND_EXPR_CASES = (
+    "Value < 2 && Count < 3",
+    "Value < 2 || Count < 3",
+    "Value < Limit ? true : false",
+    "(Value < 2) ? true : false",
+    "N < (Limit + 1)",
+    "N < (Limit << 1)",
+    "Value < 2 && kCount < Limit",
+    "Value < 2 || (kCount < Limit)",
+    "Value < 2 && (Count < 3)",
+    "Value < (2 + Count)",
+    "Value < 2 && Count < 3 && N < Limit",
+)
+
+
+@pytest.mark.parametrize("expression", _COMPOUND_EXPR_CASES)
+def test_compound_nttp_comparison_preserves_outer_parameter(expression):
+    """Boolean, conditional and arithmetic operands must keep the second arg."""
+    declaration = f"Foo<{expression}, std::vector<int>> value"
+    actual = cpplint.SplitConstructorArguments(declaration + ", int code")
+    assert actual == [declaration, " int code"], (expression, actual)
+
+
+@pytest.mark.parametrize("compiler", ["g++", "clang++"])
+def test_compound_nttp_expression_grid_compiles_cpp17(compiler):
+    """Compile every compound-expression test in an independent C++17 TU."""
+    compiler_path = shutil.which(compiler)
+    if compiler_path is None:
+        pytest.skip(f"{compiler} is unavailable")
+    declarations = [
+        "#include <vector>",
+        "template<bool, class T> struct Foo {};",
+        "constexpr int Value=1, Count=1, N=1, Limit=2, kCount=1;",
+    ]
+    for index, expression in enumerate(_COMPOUND_EXPR_CASES):
+        declarations.append(
+            f"struct ExpressionCase{index} {{ ExpressionCase{index}("
+            f"Foo<{expression}, std::vector<int>> value, int code); }};"
+        )
+    result = subprocess.run(
+        [compiler_path, "-std=c++17", "-x", "c++", "-fsyntax-only", "-"],
+        input="\n".join(declarations) + "\n",
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
