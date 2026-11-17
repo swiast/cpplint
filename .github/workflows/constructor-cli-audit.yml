@@ -81,3 +81,89 @@ jobs:
           path: audit-evidence/
           retention-days: 30
           if-no-files-found: error
+  candidate-pytest:
+    name: Candidate pytest (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ea9f7c08c287e893ccd0f6a8c84736c01e8f7a86
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: Apply verified local candidate to pinned source
+        shell: bash
+        env:
+          CANDIDATE_PATCH: >-
+            LS0tIGEvY3BwbGludC5weQorKysgYi9jcHBsaW50LnB5CkBAIC0zNzg2LDE1ICszNzg2LDQ0IEBACiAKIAogZGVmIFNwbGl0Q29uc3RydWN0b3JBcmd1bWVu
+            dHMoYXJndW1lbnRfdGV4dCk6CisgICAgYXJndW1lbnRzLCBfID0gX0NvbnN0cnVjdG9yQXJndW1lbnRzRm9yRXhwbGljaXRuZXNzKGFyZ3VtZW50X3RleHQp
+            CisgICAgcmV0dXJuIGFyZ3VtZW50cworCisKK2RlZiBfQ29uc3RydWN0b3JBcmd1bWVudHNGb3JFeHBsaWNpdG5lc3MoYXJndW1lbnRfdGV4dCk6CisgICAg
+            YXJndW1lbnRzLCBpbWJhbGFuY2UsIGNhbmRpZGF0ZXMgPSBfU2NhbkNvbnN0cnVjdG9yQXJndW1lbnRzKGFyZ3VtZW50X3RleHQsICgpKQorICAgIGlmIG5v
+            dCAwIDwgaW1iYWxhbmNlIDw9IDIgb3Igbm90IGltYmFsYW5jZSA8PSBsZW4oY2FuZGlkYXRlcykgPD0gODoKKyAgICAgICAgcmV0dXJuIGFyZ3VtZW50cywg
+            RmFsc2UKKworICAgIGJhbGFuY2VkID0gW10KKyAgICBmb3IgaWdub3JlZCBpbiBpdGVydG9vbHMuY29tYmluYXRpb25zKGNhbmRpZGF0ZXMsIGltYmFsYW5j
+            ZSk6CisgICAgICAgIGFsdGVybmF0aXZlLCByZW1haW5pbmcsIF8gPSBfU2NhbkNvbnN0cnVjdG9yQXJndW1lbnRzKGFyZ3VtZW50X3RleHQsIGlnbm9yZWQp
+            CisgICAgICAgIGlmIHJlbWFpbmluZyA9PSAwOgorICAgICAgICAgICAgYmFsYW5jZWQuYXBwZW5kKGFsdGVybmF0aXZlKQorICAgIGlmIG5vdCBiYWxhbmNl
+            ZDoKKyAgICAgICAgcmV0dXJuIGFyZ3VtZW50cywgRmFsc2UKKyAgICBpZiBhbGwoYXJncyA9PSBiYWxhbmNlZFswXSBmb3IgYXJncyBpbiBiYWxhbmNlZCk6
+            CisgICAgICAgIHJldHVybiBiYWxhbmNlZFswXSwgRmFsc2UKKyAgICAjIFBhcmFtZXRlciBib3VuZGFyaWVzIGNhbiBkaXNhZ3JlZSB3aGlsZSBhbGwgY2Fu
+            ZGlkYXRlcyByZXF1aXJlIHR3byBhcmd1bWVudHMuCisgICAgbXVsdGlwbGVfcmVxdWlyZWQgPSBhbGwoCisgICAgICAgIG5vdCBhbnkoIiYmLi4uIiBpbiBh
+            cmcgZm9yIGFyZyBpbiBhcmdzKQorICAgICAgICBhbmQgc3VtKG5vdCBIYXNEZWZhdWx0Q29uc3RydWN0b3JJbml0aWFsaXplcihhcmcpIGZvciBhcmcgaW4g
+            YXJncykgPj0gMgorICAgICAgICBmb3IgYXJncyBpbiBiYWxhbmNlZAorICAgICkKKyAgICByZXR1cm4gYXJndW1lbnRzLCBtdWx0aXBsZV9yZXF1aXJlZAor
+            CisKK2RlZiBfU2NhbkNvbnN0cnVjdG9yQXJndW1lbnRzKGFyZ3VtZW50X3RleHQsIGlnbm9yZWQpOgogICAgICIiIlNwbGl0IG9uIHRvcC1sZXZlbCBjb21t
+            YXMgd2l0aG91dCByZXBlYXRlZGx5IHNjYW5uaW5nIG1lcmdlZCBmcmFnbWVudHMuIiIiCiAgICAgaWYgbm90IGFyZ3VtZW50X3RleHQ6Ci0gICAgICAgIHJl
+            dHVybiBbXQorICAgICAgICByZXR1cm4gW10sIDAsIFtdCiAKICAgICBhcmd1bWVudHMgPSBbXQogICAgIGN1cnJlbnQgPSBbXQogICAgIGFuZ2xlX2RlcHRo
+            ID0gMAogICAgIHBhcmVuX2RlcHRoID0gMAogICAgIHByZXZpb3VzX3NpZ25pZmljYW50ID0gIiIKKyAgICBjYW5kaWRhdGVzID0gW10KICAgICBpbmRleCA9
+            IDAKICAgICB3aGlsZSBpbmRleCA8IGxlbihhcmd1bWVudF90ZXh0KToKICAgICAgICAgY2hhciA9IGFyZ3VtZW50X3RleHRbaW5kZXhdCkBAIC0zODE4LDcg
+            KzM4NDcsMTAgQEAKICAgICAgICAgICAgIHBhcmVuX2RlcHRoIC09IDEKICAgICAgICAgZWxpZiBwYXJlbl9kZXB0aCA9PSAwOgogICAgICAgICAgICAgaWYg
+            Y2hhciA9PSAiPCI6Ci0gICAgICAgICAgICAgICAgYW5nbGVfZGVwdGggKz0gMQorICAgICAgICAgICAgICAgIGlmIGluZGV4IG5vdCBpbiBpZ25vcmVkOgor
+            ICAgICAgICAgICAgICAgICAgICBpZiBhbmdsZV9kZXB0aCA+IDA6CisgICAgICAgICAgICAgICAgICAgICAgICBjYW5kaWRhdGVzLmFwcGVuZChpbmRleCkK
+            KyAgICAgICAgICAgICAgICAgICAgYW5nbGVfZGVwdGggKz0gMQogICAgICAgICAgICAgZWxpZiBjaGFyID09ICI+IjoKICAgICAgICAgICAgICAgICBhbmds
+            ZV9kZXB0aCAtPSAxCiAKQEAgLTM4MzUsNyArMzg2Nyw3IEBACiAgICAgICAgIGluZGV4ICs9IDEKIAogICAgIGFyZ3VtZW50cy5hcHBlbmQoIiIuam9pbihj
+            dXJyZW50KSkKLSAgICByZXR1cm4gYXJndW1lbnRzCisgICAgcmV0dXJuIGFyZ3VtZW50cywgYW5nbGVfZGVwdGgsIGNhbmRpZGF0ZXMKIAogCiBkZWYgSGFz
+            RGVmYXVsdENvbnN0cnVjdG9ySW5pdGlhbGl6ZXIoYXJndW1lbnQpOgpAQCAtMzk5Myw3ICs0MDI1LDkgQEAKICAgICAgICAgaXNfbWFya2VkX2V4cGxpY2l0
+            ID0gZXhwbGljaXRfY29uc3RydWN0b3JfbWF0Y2guZ3JvdXAoMSkKIAogICAgICAgICAjIFByZXNlcnZlIGNvbW1hcyBuZXN0ZWQgaW5zaWRlIHRlbXBsYXRl
+            cyBhbmQgcGFyZW50aGVzaXplZCBleHByZXNzaW9ucy4KLSAgICAgICAgY29uc3RydWN0b3JfYXJncyA9IFNwbGl0Q29uc3RydWN0b3JBcmd1bWVudHMoZXhw
+            bGljaXRfY29uc3RydWN0b3JfbWF0Y2guZ3JvdXAoMikpCisgICAgICAgIGNvbnN0cnVjdG9yX2FyZ3MsIG11bHRpcGxlX3JlcXVpcmVkID0gX0NvbnN0cnVj
+            dG9yQXJndW1lbnRzRm9yRXhwbGljaXRuZXNzKAorICAgICAgICAgICAgZXhwbGljaXRfY29uc3RydWN0b3JfbWF0Y2guZ3JvdXAoMikKKyAgICAgICAgKQog
+            CiAgICAgICAgIHZhcmlhZGljX2FyZ3MgPSBbYXJnIGZvciBhcmcgaW4gY29uc3RydWN0b3JfYXJncyBpZiAiJiYuLi4iIGluIGFyZ10KICAgICAgICAgIyBD
+            b21wYXJpc29ucyB3aXRoaW4gdGVtcGxhdGUgYXJndW1lbnRzIGFyZSBub3QgZGVmYXVsdCBpbml0aWFsaXplcnMuCkBAIC00MDM1LDYgKzQwNjksNyBAQAog
+            CiAgICAgICAgIGlmICgKICAgICAgICAgICAgIG5vdCBpc19tYXJrZWRfZXhwbGljaXQKKyAgICAgICAgICAgIGFuZCBub3QgbXVsdGlwbGVfcmVxdWlyZWQK
+            ICAgICAgICAgICAgIGFuZCBvbmVhcmdfY29uc3RydWN0b3IKICAgICAgICAgICAgIGFuZCBub3QgaW5pdGlhbGl6ZXJfbGlzdF9jb25zdHJ1Y3RvcgogICAg
+            ICAgICAgICAgYW5kIG5vdCBjb3B5X2NvbnN0cnVjdG9yCi0tLSBhL2NwcGxpbnRfY2xpdGVzdC5weQorKysgYi9jcHBsaW50X2NsaXRlc3QucHkKQEAgLTI3
+            MSw1ICsyNzEsMzUgQEAKICAgICBhc3NlcnQgYiJidWlsZC9pbmNsdWRlX3N1YmRpciIgaW4gZXJyCiAKIAorQHB5dGVzdC5tYXJrLnBhcmFtZXRyaXplKAor
+            ICAgICgiYXJndW1lbnRzIiwgImV4cGVjdGVkX3N0YXR1cyIpLAorICAgIFsKKyAgICAgICAgKCJQYWlyPFBhaXI8aW50LCBpbnQ+LCBGb288TiA8IEssIGlu
+            dD4+IGZsYWcsIGludCBjb2RlIiwgMCksCisgICAgICAgICgiUGFpcjxGb288TiA8IEssIGludD4sIEZvbzxOIDwgSywgaW50Pj4gZmxhZywgaW50IGNvZGUi
+            LCAwKSwKKyAgICAgICAgKCJQYWlyPEZvbzxOIDwgSywgaW50PiwgRm9vPE4gPCBLLCBpbnQ+PiBmbGFnLCBpbnQgY29kZSA9IDAiLCAxKSwKKyAgICBdLAor
+            KQorZGVmIHRlc3RfZXhwbGljaXRuZXNzX3dpdGhfbmVzdGVkX3RlbXBsYXRlX2NvbXBhcmlzb25zKHRtcF9wYXRoLCBhcmd1bWVudHMsIGV4cGVjdGVkX3N0
+            YXR1cyk6CisgICAgY3BwID0gdG1wX3BhdGggLyAiY29uc3RydWN0b3IuY2MiCisgICAgY3BwLndyaXRlX3RleHQoCisgICAgICAgIHRleHR3cmFwLmRlZGVu
+            dChmIiIiCisgICAgICAgICAgICAvLyBDb3B5cmlnaHQgMjAyNiBjcHBsaW50CisgICAgICAgICAgICB0ZW1wbGF0ZSA8Ym9vbCwgY2xhc3M+IHN0cnVjdCBG
+            b28ge3t9fTsKKyAgICAgICAgICAgIHRlbXBsYXRlIDxjbGFzcywgY2xhc3M+IHN0cnVjdCBQYWlyIHt7fX07CisgICAgICAgICAgICBjb25zdGV4cHIgaW50
+            IE4gPSAzOworICAgICAgICAgICAgY29uc3RleHByIGludCBLID0gNTsKKyAgICAgICAgICAgIHN0cnVjdCBFeGFtcGxlIHt7CisgICAgICAgICAgICAgIEV4
+            YW1wbGUoe2FyZ3VtZW50c30pOworICAgICAgICAgICAgfX07CisgICAgICAgICIiIiksCisgICAgICAgIGVuY29kaW5nPSJ1dGYtOCIsCisgICAgKQorICAg
+            IHN0YXR1cywgb3V0LCBlcnIgPSBydW5fc2hlbGxfY29tbWFuZCgKKyAgICAgICAgQkFTRV9DTUQsIGYiLS1maWx0ZXI9LSwrcnVudGltZS9leHBsaWNpdCB7
+            Y3BwLm5hbWV9IiwgY3dkPXN0cih0bXBfcGF0aCkKKyAgICApCisgICAgYXNzZXJ0IHN0YXR1cyA9PSBleHBlY3RlZF9zdGF0dXMsIChvdXQsIGVycikKKyAg
+            ICBhc3NlcnQgKGIiW3J1bnRpbWUvZXhwbGljaXRdIiBpbiBlcnIpID09IGJvb2woZXhwZWN0ZWRfc3RhdHVzKSwgKG91dCwgZXJyKQorCisKIGlmIF9fbmFt
+            ZV9fID09ICJfX21haW5fXyI6CiAgICAgcHl0ZXN0Lm1haW4oW19fZmlsZV9fXSkK
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import os
+          from pathlib import Path
+
+          patch = base64.b64decode("".join(os.environ["CANDIDATE_PATCH"].split()), validate=True)
+          assert hashlib.sha256(patch).hexdigest() == "2b2fe51b5a7ab5282187c53d3e25af3aba60ab14725d8a3fbb0667e4905c8695"
+          Path("candidate.patch").write_bytes(patch)
+          PY
+          git apply --check candidate.patch
+          git apply candidate.patch
+          git diff --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==9.2.0 pytest-cov==7.1.0 pytest-timeout==2.4.0 coverage==7.17.3 testfixtures==12.4.0
+      - name: Run upstream pytest with repository coverage gate
+        run: python -m pytest -q --color=no -rs
