@@ -1,0 +1,83 @@
+name: Constructor CLI audit
+on:
+  push:
+    branches: [research/constructor-cli-audit-20261117]
+    paths: [.github/workflows/constructor-cli-audit.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture exact sources and execute full CLI
+        shell: bash
+        run: |
+          mkdir -p audit-evidence
+          git archive --format=tar.gz --output=audit-evidence/source-head.tar.gz ea9f7c08c287e893ccd0f6a8c84736c01e8f7a86
+          git show ea9f7c08c287e893ccd0f6a8c84736c01e8f7a86:cpplint.py > audit-evidence/cpplint_head.py
+          git show 1e7f9d4eca33d58899fc4be0e9637f1d4a01ee51:cpplint.py > audit-evidence/cpplint_base.py
+          python3 - <<'PY'
+          import datetime, hashlib, importlib.util, json, pathlib, shutil, subprocess, sys
+          root = pathlib.Path('audit-evidence').resolve()
+          def run(args):
+              p = subprocess.run(args, text=True, capture_output=True, timeout=45)
+              return {'command': args, 'returncode': p.returncode, 'stdout': p.stdout, 'stderr': p.stderr}
+          versions = {'python': sys.version, 'observed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          for compiler in ('g++', 'clang++'):
+              versions[compiler] = run([compiler, '--version']) if shutil.which(compiler) else None
+          cases = [
+              ('identifier_less', 'Foo<N < 7, int> flag, int code', False),
+              ('identifier_ternary', 'Foo<N < 7 ? true : false, int> flag, int code', False),
+              ('parenthesized_less', 'Foo<(N < 7), int> flag, int code', False),
+              ('numeric_less', 'Foo<1 < 7, int> flag, int code', False),
+              ('sizeof_less', 'Foo<sizeof(int) < 7, int> flag, int code', False),
+              ('less_equal', 'Foo<N <= 7, int> flag, int code', False),
+              ('equal', 'Foo<N == 7, int> flag, int code', False),
+              ('greater_equal', 'Foo<N >= 7, int> flag, int code', False),
+              ('nested_template', 'std::map<int, std::vector<int>> flag, int code', False),
+              ('nested_one', 'std::map<int, std::vector<int>> flag', True),
+              ('single_parameter', 'int value', True),
+              ('two_required', 'int value, int code', False),
+              ('default_comparison', 'int value, bool flag = N < 7', True),
+              ('default_shift', 'int value, int code = 1 << 1', True),
+              ('three_required_shift', 'int a, int b, int code = 1 << 1', False),
+              ('default_function', 'int value, int code = f(1, 2)', True),
+              ('empty', '', False),
+          ]
+          prefix = '// Copyright 2026\n#include <map>\n#include <vector>\ntemplate<bool, class> struct Foo {};\nconstexpr int N = 3;\nint f(int, int);\nstruct Example {\n'
+          results = []
+          for name, arguments, warning_expected in cases:
+              file = root / (name + '.cc')
+              file.write_text(prefix + '  Example(' + arguments + ');\n};\n', encoding='utf-8')
+              entry = {'name': name, 'arguments': arguments, 'warning_expected': warning_expected, 'compilers': {}, 'cli': {}}
+              for compiler in ('g++', 'clang++'):
+                  if shutil.which(compiler):
+                      entry['compilers'][compiler] = run([compiler, '-std=c++17', '-fsyntax-only', str(file)])
+              for label in ('base', 'head'):
+                  execution = run([sys.executable, str(root / ('cpplint_' + label + '.py')), '--filter=-,+runtime/explicit', str(file)])
+                  execution['explicit_warning'] = '[runtime/explicit]' in execution['stderr']
+                  execution['traceback'] = 'Traceback' in execution['stderr']
+                  entry['cli'][label] = execution
+              results.append(entry)
+              print(json.dumps({'name': name, 'compiled': {k:v['returncode'] for k,v in entry['compilers'].items()}, 'expected':warning_expected, 'head':entry['cli']['head']['explicit_warning'], 'head_crash':entry['cli']['head']['traceback'], 'base_crash':entry['cli']['base']['traceback']}), flush=True)
+          sources = {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('cpplint_*.py')}
+          payload = {'versions':versions, 'source_head':'ea9f7c08c287e893ccd0f6a8c84736c01e8f7a86', 'source_base':'1e7f9d4eca33d58899fc4be0e9637f1d4a01ee51', 'sha256':sources, 'cases':results}
+          (root/'results.json').write_text(json.dumps(payload, indent=2), encoding='utf-8')
+          assert len(results) == 17
+          assert all(all(c['returncode'] == 0 for c in r['compilers'].values()) for r in results), 'A fixture was not compiler-valid'
+          assert not any(r['cli']['head']['traceback'] for r in results), 'Head crashed; inspect logs'
+          # This audit records defects; green means evidence capture succeeded, NOT that cpplint is defect-free.
+          print('EVIDENCE_CAPTURE_COMPLETE; NOT_A_CORRECTNESS_PASS')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: constructor-cli-audit-evidence
+          path: audit-evidence/
+          retention-days: 30
+          if-no-files-found: error
